@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"github": {
+			"type": "http",
+			"url": "https://api.githubcopilot.com/mcp/"
+		},
+		"my-mcp-server-dcbe1bbc": {
+			"url": "https://friendly-meme-w44vr9xvxq6fv555-8000.app.github.dev/",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}
