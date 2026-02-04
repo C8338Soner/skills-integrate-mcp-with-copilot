@@ -19,8 +19,86 @@ current_dir = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=os.path.join(Path(__file__).parent,
           "static")), name="static")
 
+from pydantic import BaseModel
+from typing import Optional
+
+# In-memory user database (students and clubs)
+users = {
+    "students": {},  # email: {"name": ..., "password": ..., "profile": {...}}
+    "clubs": {}      # email: {"name": ..., "password": ..., "profile": {...}}
+}
+
 # In-memory activity database
 activities = {
+    class UserRegister(BaseModel):
+        email: str
+        name: str
+        password: str
+
+    class UserLogin(BaseModel):
+        email: str
+        password: str
+
+    class UserProfile(BaseModel):
+        name: Optional[str] = None
+        bio: Optional[str] = None
+
+    # --- Authentication & Profile Endpoints ---
+    @app.post("/register/{user_type}")
+    def register_user(user_type: str, user: UserRegister):
+        if user_type not in users:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+        if user.email in users[user_type]:
+            raise HTTPException(status_code=400, detail="User already exists")
+        users[user_type][user.email] = {
+            "name": user.name,
+            "password": user.password,
+            "profile": {"name": user.name, "bio": ""}
+        }
+        return {"message": f"{user_type.title()} registered successfully"}
+
+    @app.post("/login/{user_type}")
+    def login_user(user_type: str, creds: UserLogin):
+        if user_type not in users:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+        user = users[user_type].get(creds.email)
+        if not user or user["password"] != creds.password:
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+        return {"message": f"{user_type.title()} logged in", "profile": user["profile"]}
+
+    @app.get("/profile/{user_type}/{email}")
+    def get_profile(user_type: str, email: str):
+        if user_type not in users:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+        user = users[user_type].get(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user["profile"]
+
+    @app.put("/profile/{user_type}/{email}")
+    def update_profile(user_type: str, email: str, profile: UserProfile):
+        if user_type not in users:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+        user = users[user_type].get(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if profile.name is not None:
+            user["profile"]["name"] = profile.name
+        if profile.bio is not None:
+            user["profile"]["bio"] = profile.bio
+        return {"message": "Profile updated", "profile": user["profile"]}
+
+    @app.put("/change-password/{user_type}/{email}")
+    def change_password(user_type: str, email: str, data: UserLogin):
+        if user_type not in users:
+            raise HTTPException(status_code=400, detail="Invalid user type")
+        user = users[user_type].get(email)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        if user["password"] != data.password:
+            raise HTTPException(status_code=401, detail="Current password incorrect")
+        user["password"] = data.name  # Here, 'name' field is used for new password
+        return {"message": "Password changed"}
     "Chess Club": {
         "description": "Learn strategies and compete in chess tournaments",
         "schedule": "Fridays, 3:30 PM - 5:00 PM",
